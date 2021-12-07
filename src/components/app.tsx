@@ -2,7 +2,6 @@ import {createHashHistory} from 'history';
 import {FunctionalComponent, h} from 'preact';
 import {Route, Router} from 'preact-router';
 import {useMemo, useState} from 'preact/hooks';
-import baseroute from '../baseroute';
 import Changelog from '../routes/changelog';
 import Home from '../routes/home';
 import NotFoundPage from '../routes/notfound';
@@ -39,12 +38,10 @@ const App: FunctionalComponent = () => {
           // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
           // @ts-ignore
           history={createHashHistory()}
-          onChange={({url}): void =>
-            setCurrentRoute(url.substr(baseroute.length))
-          }
+          onChange={({url}): void => setCurrentRoute(url)}
         >
-          <Route path={`${baseroute}/`} component={Home} />
-          <Route path={`${baseroute}/changelog`} component={Changelog} />
+          <Route path="/" component={Home} />
+          <Route path="/changelog" component={Changelog} />
           <NotFoundPage default />
         </Router>
       </Theme.Provider>

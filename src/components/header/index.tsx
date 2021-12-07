@@ -33,7 +33,7 @@ const Header: FunctionalComponent<{currentRoute?: string}> = ({
               class={`nav-item ${path === currentRoute ? 'active' : ''}`}
               key={index}
             >
-              <Link href={[baseroute, path].join('')} class="nav-link">
+              <Link href={path} class="nav-link">
                 {label}
               </Link>
             </li>
