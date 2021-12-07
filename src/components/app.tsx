@@ -48,7 +48,7 @@ const App: FunctionalComponent = () => {
           <NotFoundPage default />
         </Router>
       </Theme.Provider>
-      <div style={{position: 'absolute', right: 10, bottom: 10}}>
+      <div style={{float: 'right', paddingRight: 10, paddingBottom: 10}}>
         <button class="btn" onClick={toggleTheme}>
           {theme === 'light' ? '🌚' : '☀️'}
         </button>
