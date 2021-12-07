@@ -1,8 +1,9 @@
 import {compile} from 'handlebars';
 import {DateTime} from 'luxon';
 import {FunctionalComponent, h} from 'preact';
-import {useMemo, useState} from 'preact/hooks';
+import {useContext, useMemo, useState} from 'preact/hooks';
 import Select, {StylesConfig} from 'react-select';
+import {Theme} from '../../components/Theme';
 import {charges} from './charges';
 
 const DEFAULT_TEMPLATE = `
@@ -18,26 +19,49 @@ Please note that signing this citation is not an admission of guilt, and that yo
 {{callsign}} {{rank}} {{officerName}}
 {{dateTime}}`;
 
-const options = charges.map(({charge, fine}, index) => ({
-  value: index,
-  label: `${charge} ($${fine})`,
-}));
+const getOptions = (
+  exitingOptions: {value: string; label: string}[] = [],
+): {value: string; label: string}[] =>
+  [
+    ...charges.map(({charge}, index) => ({
+      value: String.fromCharCode(index + 65),
+      label: charge,
+    })),
+    ...exitingOptions.map(({value, label}) => ({value: value + 1, label})),
+  ].sort((a, b) => a.value.localeCompare(b.value));
+
 const customStyles: StylesConfig = {
+  menuList: (provided) => ({
+    ...provided,
+    backgroundColor: '#303337',
+  }),
+  noOptionsMessage: () => ({
+    textAlign: 'center',
+    backgroundColor: '#303337',
+    color: '#D3D4D5',
+  }),
   container: () => ({
     backgroundColor: '#303337',
     color: '#D3D4D5',
   }),
+  input: (provided) => ({
+    ...provided,
+    color: '#D3D4D5',
+  }),
   option: (provided, state) => ({
     ...provided,
+    ':active': {
+      backgroundColor: '#232323',
+    },
     borderBottom: '1px solid #47494D',
-    backgroundColor: '#303337',
-    color: '#D3D4D5', // state.isSelected ? "red" : "#D3D4D5",
-    padding: 20,
+    backgroundColor: state.isFocused ? '#222426' : '#303337',
+    color: '#D3D4D5',
+    padding: 5,
   }),
   control: () => ({
     display: 'flex',
   }),
-  singleValue: (provided, state) => ({
+  singleValue: (provided) => ({
     ...provided,
     color: '#D3D4D5',
   }),
@@ -46,9 +70,14 @@ const customStyles: StylesConfig = {
 const numberFormat = new Intl.NumberFormat('en-US');
 
 const Home: FunctionalComponent = () => {
+  const theme = useContext(Theme);
+
   const [fullName, setFullName] = useState<string>('');
   const [fine, setFine] = useState<string>('');
   const [points, setPoints] = useState<string>('');
+  const [chargesOptions, setChargesOptions] = useState<
+    {value: string; label: string}[]
+  >(getOptions());
   const [charges, setCharges] = useState<string[]>([]);
   const [department, setDepartment] = useState(
     localStorage.department ?? 'The Bay',
@@ -61,6 +90,7 @@ const Home: FunctionalComponent = () => {
   const [template, setTemplate] = useState(
     localStorage.template ?? DEFAULT_TEMPLATE.trim(),
   );
+  const [mdw, setMDW] = useState('');
   const result = useMemo(
     () =>
       compile(template.trim())({
@@ -103,11 +133,13 @@ const Home: FunctionalComponent = () => {
     setFine('');
     setPoints('');
     setCharges([]);
+    setChargesOptions(getOptions());
     setDepartment(localStorage.department ?? 'The Bay');
     setOfficerName(localStorage.officerName ?? 'Matt Rhodes');
     setRank(localStorage.rank ?? 'Undersheriff');
     setCallsign(localStorage.callsign ?? '320');
     setTemplate(localStorage.template ?? DEFAULT_TEMPLATE.trim());
+    setMDW('');
   };
 
   return (
@@ -180,20 +212,38 @@ const Home: FunctionalComponent = () => {
           <div class="col-sm">
             <label for="charges">Charges</label>
             <Select
-              options={options}
-              styles={customStyles}
+              noOptionsMessage={(): string => 'No charge found'}
+              options={chargesOptions}
+              styles={theme === 'light' ? {} : customStyles}
               tabSelectsValue
               isMulti={true}
               value={charges}
-              onChange={(value): void =>
-                setCharges(Array.isArray(value) ? value : [])
-              }
+              placeholder="Charge names"
+              onChange={(value): void => {
+                const charges = Array.isArray(value) ? value : [];
+                setCharges(charges);
+                setChargesOptions(getOptions(charges));
+              }}
             />
           </div>
         </div>
         <div class="form-row row-eq-spacing-sm">
+          <div class="col-sm" style={{display: 'none'}}>
+            <label for="mdw">MDW output</label>
+            <textarea
+              id="mdw"
+              class="form-control"
+              placeholder={`Copy the "Criminal scum" section of the report in the MDW and paste it here`}
+              style={{minHeight: '25rem'}}
+              onInput={({target}): void =>
+                setMDW((target as HTMLInputElement).value)
+              }
+            >
+              {mdw}
+            </textarea>
+          </div>
           <div class="col-sm">
-            <label for="result">Citation</label>
+            <label for="result">Citation output</label>
             <textarea
               id="result"
               class="form-control"
@@ -214,7 +264,7 @@ const Home: FunctionalComponent = () => {
                 <input
                   type="text"
                   class="form-control"
-                  placeholder="0"
+                  placeholder="Kayn Larp"
                   id="officerName"
                   value={officerName}
                   onInput={({target}): void =>

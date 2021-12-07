@@ -1,7 +1,19 @@
-import { FunctionalComponent, h } from "preact";
-import baseroute from "../../baseroute";
+import {FunctionalComponent, h} from 'preact';
+import {Link} from 'preact-router';
+import baseroute from '../../baseroute';
 
-const Header: FunctionalComponent = () => {
+const routes = [
+  {path: '/', label: 'Generator'},
+  {path: '/changelog', label: 'Changelog'},
+];
+
+const currentVersion = 'v0.3.0';
+const isNewVersion = localStorage.previousVersion !== currentVersion;
+localStorage.previousVersion = currentVersion;
+
+const Header: FunctionalComponent<{currentRoute?: string}> = ({
+  currentRoute,
+}) => {
   return (
     <header>
       <nav class="navbar">
@@ -10,22 +22,36 @@ const Header: FunctionalComponent = () => {
           Citation szn
         </a>
 
-        <span class="navbar-text text-monospace">v0.2.0</span>
+        <span class="navbar-text text-monospace">{currentVersion}</span>
+        {isNewVersion ? (
+          <span class="navbar-text badge badge-danger badge-pill">new</span>
+        ) : null}
 
         <ul class="navbar-nav d-none d-md-flex">
-          <li class="nav-item active">
-            <a href="#" class="nav-link">
-              Generator
-            </a>
-          </li>
+          {routes.map(({path, label}, index) => (
+            <li
+              class={`nav-item ${path === currentRoute ? 'active' : ''}`}
+              key={index}
+            >
+              <Link href={[baseroute, path].join('')} class="nav-link">
+                {label}
+              </Link>
+            </li>
+          ))}
+
           <li class="nav-item">
-            <a href="#" class="nav-link">
-              Changelog
-            </a>
-          </li>
-          <li class="nav-item">
-            <a href="#" class="nav-link">
-              Credits
+            <a
+              href="https://github.com/nmussy/citation-szn"
+              class="nav-link"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <img
+                src={`${baseroute}/assets/GitHub-Mark-Light-64px.png`}
+                alt="GitHub logo"
+                style={{maxWidth: 15, marginRight: 5}}
+              />
+              GitHub
             </a>
           </li>
         </ul>
