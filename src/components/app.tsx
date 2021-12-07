@@ -34,7 +34,9 @@ const App: FunctionalComponent = () => {
     <div id="preact_root">
       <Theme.Provider value={theme}>
         <Header currentRoute={currentRoute} />
-        <Router onChange={({url}): void => setCurrentRoute(url)}>
+        <Router
+          onChange={({url}): void => setCurrentRoute(url.substr(baseroute.length))}
+        >
           <Route path={`${baseroute}/`} component={Home} />
           <Route path={`${baseroute}/changelog`} component={Changelog} />
           <NotFoundPage default />
