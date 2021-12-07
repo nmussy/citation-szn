@@ -10,7 +10,7 @@ const Header: FunctionalComponent = () => {
           Citation szn
         </a>
 
-        <span class="navbar-text text-monospace">v0.1.0</span>
+        <span class="navbar-text text-monospace">v0.2.0</span>
 
         <ul class="navbar-nav d-none d-md-flex">
           <li class="nav-item active">
