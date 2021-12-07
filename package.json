@@ -17,7 +17,7 @@
     "dev": "preact watch",
     "lint": "eslint 'src/**/*.{js,jsx,ts,tsx}'",
     "test": "jest ./tests",
-    "predeploy": "cross-env GITHUB_PAGES=citation-szn yarn build && dot-json ./build/manifest.json start_url '/citation-szn/'",
+    "predeploy": "cross-env GITHUB_PAGES=citation-szn yarn build --no-prerender && dot-json ./build/manifest.json start_url '/citation-szn/'",
     "deploy": "gh-pages -d build"
   },
   "eslintConfig": {
