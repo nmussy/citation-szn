@@ -1,3 +1,4 @@
+import {createHashHistory} from 'history';
 import {FunctionalComponent, h} from 'preact';
 import {Route, Router} from 'preact-router';
 import {useMemo, useState} from 'preact/hooks';
@@ -35,7 +36,12 @@ const App: FunctionalComponent = () => {
       <Theme.Provider value={theme}>
         <Header currentRoute={currentRoute} />
         <Router
-          onChange={({url}): void => setCurrentRoute(url.substr(baseroute.length))}
+          // eslint-disable-next-line @typescript-eslint/ban-ts-ignore
+          // @ts-ignore
+          history={createHashHistory()}
+          onChange={({url}): void =>
+            setCurrentRoute(url.substr(baseroute.length))
+          }
         >
           <Route path={`${baseroute}/`} component={Home} />
           <Route path={`${baseroute}/changelog`} component={Changelog} />

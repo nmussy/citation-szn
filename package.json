@@ -34,6 +34,7 @@
   "dependencies": {
     "halfmoon": "^1.1.1",
     "handlebars": "^4.7.7",
+    "history": "^5.1.0",
     "luxon": "^2.1.1",
     "preact": "^10.3.1",
     "preact-render-to-string": "^5.1.4",
