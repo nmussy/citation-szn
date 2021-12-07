@@ -6,16 +6,16 @@ import Select, {StylesConfig} from 'react-select';
 import {charges} from './charges';
 
 const DEFAULT_TEMPLATE = `
-Undersheriff M. Rhodes has hereby cited {{fullName}} with the following charges:
+{{rank}} {{officerName}} of the {{department}} has hereby cited {{fullName}} with the following charges:
 {{#each charges}}
     \u2022 {{label}}
 {{/each}}
 
-This citation amounts to a \${{fine}} fine and {{points}} points on your driving license
+This citation amounts to a \${{fine}} fine and {{points}} points on your driver's license
 
 Please note that signing this citation is not an admission of guilt, and that you have 60 days to contest these charges.
 
-320 Undersheriff M. Rhodes
+{{callsign}} {{rank}} {{officerName}}
 {{dateTime}}`;
 
 const options = charges.map(({charge, fine}, index) => ({
@@ -35,7 +35,7 @@ const customStyles: StylesConfig = {
     padding: 20,
   }),
   control: () => ({
-    width: 200,
+    display: 'flex',
   }),
   singleValue: (provided, state) => ({
     ...provided,
@@ -50,8 +50,17 @@ const Home: FunctionalComponent = () => {
   const [fine, setFine] = useState<string>('');
   const [points, setPoints] = useState<string>('');
   const [charges, setCharges] = useState<string[]>([]);
-  const [template, setTemplate] = useState(DEFAULT_TEMPLATE.trim());
-  console.log(charges);
+  const [department, setDepartment] = useState(
+    localStorage.department ?? 'The Bay',
+  );
+  const [officerName, setOfficerName] = useState(
+    localStorage.officerName ?? 'Matt Rhodes',
+  );
+  const [rank, setRank] = useState(localStorage.rank ?? 'Undersheriff');
+  const [callsign, setCallsign] = useState(localStorage.callsign ?? '320');
+  const [template, setTemplate] = useState(
+    localStorage.template ?? DEFAULT_TEMPLATE.trim(),
+  );
   const result = useMemo(
     () =>
       compile(template.trim())({
@@ -59,20 +68,46 @@ const Home: FunctionalComponent = () => {
         fine: fine ? numberFormat.format(Number(fine)) : '',
         points,
         charges,
+        department,
+        officerName,
+        rank,
+        callsign,
         dateTime: DateTime.now()
           .setLocale('en-US')
           .setZone('America/New_York')
           .toFormat(`DDDD 'at' tt ZZZZ`),
       }),
-    [template, fullName, fine, points, charges],
+    [
+      template,
+      fullName,
+      fine,
+      points,
+      charges,
+      callsign,
+      department,
+      officerName,
+      rank,
+    ],
   );
+
+  const save = (): void => {
+    localStorage.department = department;
+    localStorage.officerName = officerName;
+    localStorage.rank = rank;
+    localStorage.callsign = callsign;
+    localStorage.template = template;
+  };
 
   const reset = (): void => {
     setFullName('');
     setFine('');
     setPoints('');
     setCharges([]);
-    setTemplate(DEFAULT_TEMPLATE.trim());
+    setDepartment(localStorage.department ?? 'The Bay');
+    setOfficerName(localStorage.officerName ?? 'Matt Rhodes');
+    setRank(localStorage.rank ?? 'Undersheriff');
+    setCallsign(localStorage.callsign ?? '320');
+    setTemplate(localStorage.template ?? DEFAULT_TEMPLATE.trim());
   };
 
   return (
@@ -93,9 +128,7 @@ const Home: FunctionalComponent = () => {
       <form>
         <div class="form-row row-eq-spacing-sm">
           <div class="col-sm">
-            <label for="full-name" class="required">
-              Criminal scum name
-            </label>
+            <label for="full-name">Criminal scum name</label>
             <input
               type="text"
               class="form-control"
@@ -110,9 +143,7 @@ const Home: FunctionalComponent = () => {
             />
           </div>
           <div class="col-sm">
-            <label for="fine" class="required">
-              Fine
-            </label>
+            <label for="fine">Fine</label>
             <div class="input-group">
               <div class="input-group-prepend">
                 <span class="input-group-text">$</span>
@@ -132,9 +163,7 @@ const Home: FunctionalComponent = () => {
             </div>
           </div>
           <div class="col-sm">
-            <label for="points" class="required">
-              Points
-            </label>
+            <label for="points">Points</label>
             <input
               type="number"
               class="form-control"
@@ -149,9 +178,7 @@ const Home: FunctionalComponent = () => {
         </div>
         <div class="form-row row-eq-spacing-sm">
           <div class="col-sm">
-            <label for="charges" class="required">
-              Charges
-            </label>
+            <label for="charges">Charges</label>
             <Select
               options={options}
               styles={customStyles}
@@ -166,9 +193,7 @@ const Home: FunctionalComponent = () => {
         </div>
         <div class="form-row row-eq-spacing-sm">
           <div class="col-sm">
-            <label for="result" class="required">
-              Citation
-            </label>
+            <label for="result">Citation</label>
             <textarea
               id="result"
               class="form-control"
@@ -181,12 +206,64 @@ const Home: FunctionalComponent = () => {
           </div>
         </div>
         <details class="collapse-panel">
-          <summary class="collapse-header">Advanced</summary>
+          <summary class="collapse-header">Configuration</summary>
           <div class="collapse-content">
             <div class="form-row row-eq-spacing-sm">
-              <label for="template" class="required">
-                Template
-              </label>
+              <div class="col-sm">
+                <label for="officerName">Officer name</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="0"
+                  id="officerName"
+                  value={officerName}
+                  onInput={({target}): void =>
+                    setOfficerName((target as HTMLInputElement).value)
+                  }
+                />
+              </div>
+              <div class="col-sm">
+                <label for="department">Department</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="BCSO > LSPD"
+                  id="department"
+                  value={department}
+                  onInput={({target}): void =>
+                    setDepartment((target as HTMLInputElement).value)
+                  }
+                />
+              </div>
+              <div class="col-sm">
+                <label for="rank">Rank</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  placeholder="Under the Undersheriff"
+                  id="rank"
+                  value={rank}
+                  onInput={({target}): void =>
+                    setRank((target as HTMLInputElement).value)
+                  }
+                />
+              </div>
+              <div class="col-sm">
+                <label for="callsign">Callsign</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  placeholder="220"
+                  id="callsign"
+                  value={callsign}
+                  onInput={({target}): void =>
+                    setCallsign((target as HTMLInputElement).value)
+                  }
+                />
+              </div>
+            </div>
+            <div class="form-row row-eq-spacing-sm">
+              <label for="template">Citation template</label>
               <textarea
                 id="template"
                 class="form-control"
@@ -198,6 +275,11 @@ const Home: FunctionalComponent = () => {
               >
                 {template}
               </textarea>
+            </div>
+            <div style={{textAlign: 'right'}}>
+              <button class="btn btn-success" type="button" onClick={save}>
+                Save configuration
+              </button>
             </div>
           </div>
         </details>
