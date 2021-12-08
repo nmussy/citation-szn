@@ -396,15 +396,15 @@ const Home: FunctionalComponent = () => {
             </div>
             <div class="form-row row-eq-spacing-sm">
               <label for="template">Citation template</label>
-              <TextareaAutosize
+              <textarea
                 id="template"
-                className="form-control"
+                class="form-control"
                 placeholder="Template"
                 onChange={({target}): void =>
                   setTemplate((target as HTMLTextAreaElement).value)
                 }
                 value={template}
-                style={{resize: 'none'}}
+                style={{minHeight: '25rem'}}
               />
             </div>
             <div style={{textAlign: 'right'}}>
