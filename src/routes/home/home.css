@@ -1,0 +1,3 @@
+[data-toggle='tooltip']::after {
+  --tooltip-width: 30rem;
+}

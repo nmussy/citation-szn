@@ -2,9 +2,11 @@ import {compile} from 'handlebars';
 import {DateTime} from 'luxon';
 import {FunctionalComponent, h} from 'preact';
 import {useContext, useMemo, useState} from 'preact/hooks';
+import TextareaAutosize from 'react-autosize-textarea';
 import Select, {StylesConfig} from 'react-select';
 import {Theme} from '../../components/Theme';
 import {charges} from './charges';
+import './home.css';
 
 const DEFAULT_TEMPLATE = `
 {{rank}} {{officerName}} of the {{department}} has hereby cited {{fullName}} with the following charges:
@@ -12,16 +14,15 @@ const DEFAULT_TEMPLATE = `
     \u2022 {{label}}
 {{/each}}
 
-This citation amounts to a \${{fine}} fine and {{points}} points on your driver's license
+This citation amounts to a \${{fine}} fine{{#if points}} and {{points}} points on their driver's license{{/if}}.
 
 Please note that signing this citation is not an admission of guilt, and that you have 60 days to contest these charges.
 
 {{callsign}} {{rank}} {{officerName}}
 {{dateTime}}`;
 
-const getOptions = (
-  exitingOptions: {value: string; label: string}[] = [],
-): {value: string; label: string}[] =>
+type Option = {value: string; label: string};
+const getOptions = (exitingOptions: Option[] = []): Option[] =>
   [
     ...charges.map(({charge}, index) => ({
       value: String.fromCharCode(index + 65),
@@ -67,7 +68,9 @@ const customStyles: StylesConfig = {
   }),
 };
 
-const numberFormat = new Intl.NumberFormat('en-US');
+const numberFormat = new Intl.NumberFormat('en-US', {
+  minimumFractionDigits: 2,
+});
 
 const Home: FunctionalComponent = () => {
   const theme = useContext(Theme);
@@ -75,10 +78,8 @@ const Home: FunctionalComponent = () => {
   const [fullName, setFullName] = useState<string>('');
   const [fine, setFine] = useState<string>('');
   const [points, setPoints] = useState<string>('');
-  const [chargesOptions, setChargesOptions] = useState<
-    {value: string; label: string}[]
-  >(getOptions());
-  const [charges, setCharges] = useState<string[]>([]);
+  const [chargesOptions, setChargesOptions] = useState<Option[]>(getOptions());
+  const [charges, setCharges] = useState<Option[]>([]);
   const [department, setDepartment] = useState(
     localStorage.department ?? 'The Bay',
   );
@@ -90,6 +91,7 @@ const Home: FunctionalComponent = () => {
   const [template, setTemplate] = useState(
     localStorage.template ?? DEFAULT_TEMPLATE.trim(),
   );
+  const [isMDWInvalid, setIsMDWInvalid] = useState(false);
   const [mdw, setMDW] = useState('');
   const result = useMemo(
     () =>
@@ -120,6 +122,61 @@ const Home: FunctionalComponent = () => {
     ],
   );
 
+  const parseMDW = (mdw: string): void => {
+    setMDW(mdw);
+    if (!mdw.trim().length) {
+      setIsMDWInvalid(false);
+      return;
+    }
+
+    const lines = mdw.trim().split('\n');
+
+    let match;
+    const charges = [];
+    let fullName;
+    // let sentence;
+    let fine;
+    let points;
+    let endOfCharges = false;
+    for (const line of lines) {
+      if (line === 'Warrant for Arrest') {
+        endOfCharges = true;
+        continue;
+      }
+
+      if (!fullName && (match = line.match(/^([\w ]+) \(#\d+\)/))) {
+        fullName = match[1];
+        continue;
+      } else if (fullName && !endOfCharges) {
+        charges.push(line);
+      } else if (
+        endOfCharges &&
+        (match = line.match(
+          /^(\d+) months.+\/ \$([\d,.]+) fine( \/ (\d+) point)?/,
+        ))
+      ) {
+        // sentence = match[1];
+        fine = match[2];
+        points = match[4];
+        break;
+      }
+    }
+
+    if (!fullName || !fine) {
+      setIsMDWInvalid(true);
+      return;
+    }
+
+    setFullName(fullName);
+    setCharges(
+      charges.map((charge, index) => ({value: `mdw_${index}`, label: charge})),
+    );
+    setFine(parseFloat(fine.replace(/,/g, '')).toString());
+    setPoints(points ?? '');
+
+    setIsMDWInvalid(false);
+  };
+
   const save = (): void => {
     localStorage.department = department;
     localStorage.officerName = officerName;
@@ -140,16 +197,17 @@ const Home: FunctionalComponent = () => {
     setCallsign(localStorage.callsign ?? '320');
     setTemplate(localStorage.template ?? DEFAULT_TEMPLATE.trim());
     setMDW('');
+    setIsMDWInvalid(false);
   };
 
   return (
     <div class="content">
       <div class="container-fluid">
         <div class="row">
-          <div class="col-sm">
+          <div class="col">
             <h2 class="content-title">Citation generator</h2>
           </div>
-          <div class="col-sm" style={{textAlign: 'right'}}>
+          <div class="col" style={{textAlign: 'right'}}>
             <button class="btn" type="button" onClick={reset}>
               Reset
             </button>
@@ -158,6 +216,57 @@ const Home: FunctionalComponent = () => {
       </div>
 
       <form>
+        <div class="form-row row-eq-spacing-sm">
+          <div class="col-sm">
+            <div class={`form-group ${isMDWInvalid ? 'is-invalid' : ''}`}>
+              <label for="mdw">
+                MDW output{' '}
+                <button
+                  class="btn btn-square btn-sm"
+                  data-toggle="tooltip"
+                  data-title={
+                    'Select, Ctrl+C the "Criminal scum" section of the report in the MDW and paste it below'
+                  }
+                  data-placement="right"
+                  type="button"
+                >
+                  ?
+                </button>
+              </label>
+              <TextareaAutosize
+                id="mdw"
+                className="form-control"
+                placeholder={`Bryan Barker (#1130)\nJaywalking\nWiggling\nPoaching\nWarrant for Arrest\nReductions\nFinal\n50 months (+10 months parole) / $20,425.00 fine / 1 point(s)`}
+                onChange={({target}): void =>
+                  parseMDW((target as HTMLInputElement).value)
+                }
+                value={mdw}
+                style={{resize: 'none'}}
+              />
+              <div
+                class="invalid-feedback"
+                style={{display: isMDWInvalid ? '' : 'none'}}
+              >
+                <ul>
+                  <li>Unexpected MDW output</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <div class="col-sm">
+            <label for="result">Citation output</label>
+            <TextareaAutosize
+              id="result"
+              className="form-control"
+              placeholder="Template"
+              readOnly
+              value={result}
+              style={{resize: 'none'}}
+            />
+          </div>
+        </div>
+
+        <h2 class="content-title">Manual input</h2>
         <div class="form-row row-eq-spacing-sm">
           <div class="col-sm">
             <label for="full-name">Criminal scum name</label>
@@ -169,7 +278,7 @@ const Home: FunctionalComponent = () => {
               autofocus
               required
               value={fullName}
-              onInput={({target}): void =>
+              onChange={({target}): void =>
                 setFullName((target as HTMLInputElement).value)
               }
             />
@@ -188,7 +297,7 @@ const Home: FunctionalComponent = () => {
                 required
                 min={0}
                 value={fine}
-                onInput={({target}): void =>
+                onChange={({target}): void =>
                   setFine((target as HTMLInputElement).value)
                 }
               />
@@ -202,7 +311,7 @@ const Home: FunctionalComponent = () => {
               placeholder="0"
               id="points"
               value={points}
-              onInput={({target}): void =>
+              onChange={({target}): void =>
                 setPoints((target as HTMLInputElement).value)
               }
             />
@@ -227,34 +336,7 @@ const Home: FunctionalComponent = () => {
             />
           </div>
         </div>
-        <div class="form-row row-eq-spacing-sm">
-          <div class="col-sm" style={{display: 'none'}}>
-            <label for="mdw">MDW output</label>
-            <textarea
-              id="mdw"
-              class="form-control"
-              placeholder={`Copy the "Criminal scum" section of the report in the MDW and paste it here`}
-              style={{minHeight: '25rem'}}
-              onInput={({target}): void =>
-                setMDW((target as HTMLInputElement).value)
-              }
-            >
-              {mdw}
-            </textarea>
-          </div>
-          <div class="col-sm">
-            <label for="result">Citation output</label>
-            <textarea
-              id="result"
-              class="form-control"
-              placeholder="Template"
-              style={{minHeight: '25rem'}}
-              readonly
-            >
-              {result}
-            </textarea>
-          </div>
-        </div>
+
         <details class="collapse-panel">
           <summary class="collapse-header">Configuration</summary>
           <div class="collapse-content">
@@ -267,7 +349,7 @@ const Home: FunctionalComponent = () => {
                   placeholder="Kayn Larp"
                   id="officerName"
                   value={officerName}
-                  onInput={({target}): void =>
+                  onChange={({target}): void =>
                     setOfficerName((target as HTMLInputElement).value)
                   }
                 />
@@ -280,7 +362,7 @@ const Home: FunctionalComponent = () => {
                   placeholder="BCSO > LSPD"
                   id="department"
                   value={department}
-                  onInput={({target}): void =>
+                  onChange={({target}): void =>
                     setDepartment((target as HTMLInputElement).value)
                   }
                 />
@@ -293,7 +375,7 @@ const Home: FunctionalComponent = () => {
                   placeholder="Under the Undersheriff"
                   id="rank"
                   value={rank}
-                  onInput={({target}): void =>
+                  onChange={({target}): void =>
                     setRank((target as HTMLInputElement).value)
                   }
                 />
@@ -306,7 +388,7 @@ const Home: FunctionalComponent = () => {
                   placeholder="220"
                   id="callsign"
                   value={callsign}
-                  onInput={({target}): void =>
+                  onChange={({target}): void =>
                     setCallsign((target as HTMLInputElement).value)
                   }
                 />
@@ -314,17 +396,16 @@ const Home: FunctionalComponent = () => {
             </div>
             <div class="form-row row-eq-spacing-sm">
               <label for="template">Citation template</label>
-              <textarea
+              <TextareaAutosize
                 id="template"
-                class="form-control"
+                className="form-control"
                 placeholder="Template"
-                style={{minHeight: '25rem'}}
-                onInput={({target}): void =>
+                onChange={({target}): void =>
                   setTemplate((target as HTMLTextAreaElement).value)
                 }
-              >
-                {template}
-              </textarea>
+                value={template}
+                style={{resize: 'none'}}
+              />
             </div>
             <div style={{textAlign: 'right'}}>
               <button class="btn btn-success" type="button" onClick={save}>

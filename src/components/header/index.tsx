@@ -7,7 +7,7 @@ const routes = [
   {path: '/changelog', label: 'Changelog'},
 ];
 
-const currentVersion = 'v0.3.0';
+const currentVersion = 'v0.4.0';
 const isNewVersion = localStorage.previousVersion !== currentVersion;
 localStorage.previousVersion = currentVersion;
 
