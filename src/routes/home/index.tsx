@@ -1,8 +1,10 @@
+import copy from 'copy-to-clipboard';
 import {compile} from 'handlebars';
 import {DateTime} from 'luxon';
 import {FunctionalComponent, h} from 'preact';
 import {useContext, useMemo, useState} from 'preact/hooks';
 import TextareaAutosize from 'react-autosize-textarea';
+import {useBeforeunload} from 'react-beforeunload';
 import Select, {StylesConfig} from 'react-select';
 import {Theme} from '../../components/Theme';
 import {charges} from './charges';
@@ -72,8 +74,25 @@ const numberFormat = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
 });
 
+type ConfigurationKey =
+  | 'department'
+  | 'officerName'
+  | 'rank'
+  | 'callsign'
+  | 'template';
+
+const defaultConfiguration: {[key in ConfigurationKey]: string} = {
+  department: 'The Bay',
+  officerName: 'Matt Rhodes',
+  rank: 'Undersheriff',
+  callsign: '320',
+  template: DEFAULT_TEMPLATE.trim(),
+};
+
 const Home: FunctionalComponent = () => {
   const theme = useContext(Theme);
+
+  const [hasCopied, setHasCopied] = useState(false);
 
   const [fullName, setFullName] = useState<string>('');
   const [fine, setFine] = useState<string>('');
@@ -81,21 +100,28 @@ const Home: FunctionalComponent = () => {
   const [chargesOptions, setChargesOptions] = useState<Option[]>(getOptions());
   const [charges, setCharges] = useState<Option[]>([]);
   const [department, setDepartment] = useState(
-    localStorage.department ?? 'The Bay',
+    localStorage.department ?? defaultConfiguration.department,
   );
   const [officerName, setOfficerName] = useState(
-    localStorage.officerName ?? 'Matt Rhodes',
+    localStorage.officerName ?? defaultConfiguration.officerName,
   );
-  const [rank, setRank] = useState(localStorage.rank ?? 'Undersheriff');
-  const [callsign, setCallsign] = useState(localStorage.callsign ?? '320');
+  const [rank, setRank] = useState(
+    localStorage.rank ?? defaultConfiguration.rank,
+  );
+  const [callsign, setCallsign] = useState(
+    localStorage.callsign ?? defaultConfiguration.callsign,
+  );
   const [template, setTemplate] = useState(
-    localStorage.template ?? DEFAULT_TEMPLATE.trim(),
+    localStorage.template ?? defaultConfiguration.template,
   );
   const [isMDWInvalid, setIsMDWInvalid] = useState(false);
+  const [isTemplateInvalid, setIsTemplateInvalid] = useState(false);
   const [mdw, setMDW] = useState('');
-  const result = useMemo(
-    () =>
-      compile(template.trim())({
+  const result = useMemo(() => {
+    try {
+      const compiledTemplate = compile(template.trim());
+      setIsTemplateInvalid(false);
+      return compiledTemplate({
         fullName,
         fine: fine ? numberFormat.format(Number(fine)) : '',
         points,
@@ -108,19 +134,51 @@ const Home: FunctionalComponent = () => {
           .setLocale('en-US')
           .setZone('America/New_York')
           .toFormat(`DDDD 'at' tt ZZZZ`),
-      }),
-    [
-      template,
-      fullName,
-      fine,
-      points,
-      charges,
-      callsign,
+      });
+    } catch (err) {
+      setIsTemplateInvalid(true);
+      return '';
+    }
+  }, [
+    template,
+    fullName,
+    fine,
+    points,
+    charges,
+    callsign,
+    department,
+    officerName,
+    rank,
+  ]);
+
+  const [saveTimestamp, setSaveTimestamp] = useState(1);
+  const hasConfigurationChanged = useMemo(() => {
+    const configuration: {[key in ConfigurationKey]: string} = {
       department,
       officerName,
       rank,
-    ],
-  );
+      callsign,
+      template,
+    };
+
+    return (
+      saveTimestamp &&
+      (Object.keys(configuration) as ConfigurationKey[]).reduce((res, key) => {
+        return (
+          res ||
+          (localStorage[key] && configuration[key] !== localStorage[key]) ||
+          (configuration[key] !== defaultConfiguration[key] &&
+            configuration[key] !== localStorage[key])
+        );
+      }, false)
+    );
+  }, [department, officerName, rank, callsign, template, saveTimestamp]);
+
+  useBeforeunload((event) => {
+    if (hasConfigurationChanged) {
+      event.preventDefault();
+    }
+  });
 
   const parseMDW = (mdw: string): void => {
     setMDW(mdw);
@@ -183,6 +241,8 @@ const Home: FunctionalComponent = () => {
     localStorage.rank = rank;
     localStorage.callsign = callsign;
     localStorage.template = template;
+
+    setSaveTimestamp(new Date().getTime());
   };
 
   const reset = (): void => {
@@ -198,6 +258,17 @@ const Home: FunctionalComponent = () => {
     setTemplate(localStorage.template ?? DEFAULT_TEMPLATE.trim());
     setMDW('');
     setIsMDWInvalid(false);
+  };
+
+  let copiedTimeout: number;
+  const onCopy = async (): Promise<void> => {
+    copy(result);
+    setHasCopied(true);
+    if (copiedTimeout) clearTimeout(copiedTimeout);
+    copiedTimeout = window.setTimeout(() => {
+      copiedTimeout = 0;
+      setHasCopied(false);
+    }, 2000);
   };
 
   return (
@@ -236,7 +307,7 @@ const Home: FunctionalComponent = () => {
               <TextareaAutosize
                 id="mdw"
                 className="form-control"
-                placeholder={`Bryan Barker (#1130)\nJaywalking\nWiggling\nPoaching\nWarrant for Arrest\nReductions\nFinal\n50 months (+10 months parole) / $20,425.00 fine / 1 point(s)`}
+                placeholder={`Bryan Barker (#1130)\nJaywalking\nWiggling\nPossession of a Stolen Beer Truck\nWarrant for Arrest\nReductions\nFinal\n50 months (+10 months parole) / $20,425.00 fine / 1 point(s)`}
                 onChange={({target}): void =>
                   parseMDW((target as HTMLInputElement).value)
                 }
@@ -254,7 +325,18 @@ const Home: FunctionalComponent = () => {
             </div>
           </div>
           <div class="col-sm">
-            <label for="result">Citation output</label>
+            <label for="result">
+              Citation output{' '}
+              <button
+                class="btn btn-primary btn-sm"
+                type="button"
+                onClick={onCopy}
+                style={{textAlign: 'center', width: '6.5rem'}}
+                disabled={hasCopied}
+              >
+                {hasCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </label>
             <TextareaAutosize
               id="result"
               className="form-control"
@@ -394,7 +476,11 @@ const Home: FunctionalComponent = () => {
                 />
               </div>
             </div>
-            <div class="form-row row-eq-spacing-sm">
+            <div
+              class={`form-row row-eq-spacing-sm ${
+                isTemplateInvalid ? 'is-invalid' : ''
+              }`}
+            >
               <label for="template">Citation template</label>
               <textarea
                 id="template"
@@ -406,9 +492,22 @@ const Home: FunctionalComponent = () => {
                 value={template}
                 style={{minHeight: '25rem'}}
               />
+              <div
+                class="invalid-feedback"
+                style={{display: isTemplateInvalid ? '' : 'none'}}
+              >
+                <ul>
+                  <li>Template is invalid</li>
+                </ul>
+              </div>
             </div>
             <div style={{textAlign: 'right'}}>
-              <button class="btn btn-success" type="button" onClick={save}>
+              <button
+                class="btn btn-success"
+                type="button"
+                onClick={save}
+                disabled={!hasConfigurationChanged}
+              >
                 Save configuration
               </button>
             </div>

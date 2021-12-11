@@ -5,6 +5,12 @@ const Changelog: FunctionalComponent = () => {
     <div class="content">
       <div class="container-fluid">
         <h2 class="content-title">Changelog</h2>
+        <h3 class="content-title text-monospace">v0.5.0</h3>
+        <ul>
+          <li>Copy button</li>
+          <li>Handle template errors</li>
+          <li>Unsave configuration warning</li>
+        </ul>
         <h3 class="content-title text-monospace">v0.4.0</h3>
         <ul>
           <li>MDW import</li>
