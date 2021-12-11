@@ -1,13 +1,13 @@
 import copy from 'copy-to-clipboard';
-import {compile} from 'handlebars';
-import {DateTime} from 'luxon';
-import {FunctionalComponent, h} from 'preact';
-import {useContext, useMemo, useState} from 'preact/hooks';
+import { compile } from 'handlebars';
+import { DateTime } from 'luxon';
+import { FunctionalComponent, h } from 'preact';
+import { useContext, useMemo, useState } from 'preact/hooks';
 import TextareaAutosize from 'react-autosize-textarea';
-import {useBeforeunload} from 'react-beforeunload';
-import Select, {StylesConfig} from 'react-select';
-import {Theme} from '../../components/Theme';
-import {charges} from './charges';
+import { useBeforeunload } from 'react-beforeunload';
+import Select, { StylesConfig } from 'react-select';
+import { Theme } from '../../components/Theme';
+import { charges } from './charges';
 import './home.css';
 
 const DEFAULT_TEMPLATE = `
@@ -152,7 +152,21 @@ const Home: FunctionalComponent = () => {
   ]);
 
   const [saveTimestamp, setSaveTimestamp] = useState(1);
-  const hasConfigurationChanged = useMemo(() => {
+  const isConfigurationDefault = useMemo(() => {
+    const configuration: {[key in ConfigurationKey]: string} = {
+      department,
+      officerName,
+      rank,
+      callsign,
+      template,
+    };
+
+    return (Object.keys(configuration) as ConfigurationKey[]).reduce(
+      (res, key) => res && configuration[key] === defaultConfiguration[key],
+      true,
+    );
+  }, [department, officerName, rank, callsign, template]);
+  const isConfigurationUnsaved = useMemo(() => {
     const configuration: {[key in ConfigurationKey]: string} = {
       department,
       officerName,
@@ -162,20 +176,20 @@ const Home: FunctionalComponent = () => {
     };
 
     return (
-      saveTimestamp &&
-      (Object.keys(configuration) as ConfigurationKey[]).reduce((res, key) => {
-        return (
+      !!saveTimestamp &&
+      (Object.keys(configuration) as ConfigurationKey[]).reduce(
+        (res, key) =>
           res ||
           (localStorage[key] && configuration[key] !== localStorage[key]) ||
           (configuration[key] !== defaultConfiguration[key] &&
-            configuration[key] !== localStorage[key])
-        );
-      }, false)
+            configuration[key] !== localStorage[key]),
+        false,
+      )
     );
   }, [department, officerName, rank, callsign, template, saveTimestamp]);
 
   useBeforeunload((event) => {
-    if (hasConfigurationChanged) {
+    if (isConfigurationUnsaved) {
       event.preventDefault();
     }
   });
@@ -235,7 +249,7 @@ const Home: FunctionalComponent = () => {
     setIsMDWInvalid(false);
   };
 
-  const save = (): void => {
+  const saveConfiguration = (): void => {
     localStorage.department = department;
     localStorage.officerName = officerName;
     localStorage.rank = rank;
@@ -245,19 +259,44 @@ const Home: FunctionalComponent = () => {
     setSaveTimestamp(new Date().getTime());
   };
 
-  const reset = (): void => {
+  const resetForm = (): void => {
     setFullName('');
     setFine('');
     setPoints('');
     setCharges([]);
     setChargesOptions(getOptions());
-    setDepartment(localStorage.department ?? 'The Bay');
-    setOfficerName(localStorage.officerName ?? 'Matt Rhodes');
-    setRank(localStorage.rank ?? 'Undersheriff');
-    setCallsign(localStorage.callsign ?? '320');
-    setTemplate(localStorage.template ?? DEFAULT_TEMPLATE.trim());
+    setDepartment(localStorage.department ?? defaultConfiguration.department);
+    setOfficerName(
+      localStorage.officerName ?? defaultConfiguration.officerName,
+    );
+    setRank(localStorage.rank ?? defaultConfiguration.rank);
+    setCallsign(localStorage.callsign ?? defaultConfiguration.callsign);
+    setTemplate(localStorage.template ?? defaultConfiguration.template);
     setMDW('');
     setIsMDWInvalid(false);
+  };
+
+  const [isResetConfigurationConfirmed, setIsResetConfigurationConfirmed] =
+    useState(false);
+  let resetConfigurationTimeout: number;
+  const resetConfiguration = (): void => {
+    if (!isResetConfigurationConfirmed) {
+      setIsResetConfigurationConfirmed(true);
+      resetConfigurationTimeout = window.setTimeout(
+        () => setIsResetConfigurationConfirmed(false),
+        5000,
+      );
+      return;
+    }
+
+    clearTimeout(resetConfigurationTimeout);
+    setIsResetConfigurationConfirmed(false);
+
+    setDepartment(defaultConfiguration.department);
+    setOfficerName(defaultConfiguration.officerName);
+    setRank(defaultConfiguration.rank);
+    setCallsign(defaultConfiguration.callsign);
+    setTemplate(defaultConfiguration.template);
   };
 
   let copiedTimeout: number;
@@ -279,7 +318,7 @@ const Home: FunctionalComponent = () => {
             <h2 class="content-title">Citation generator</h2>
           </div>
           <div class="col" style={{textAlign: 'right'}}>
-            <button class="btn" type="button" onClick={reset}>
+            <button class="btn" type="button" onClick={resetForm}>
               Reset
             </button>
           </div>
@@ -325,18 +364,7 @@ const Home: FunctionalComponent = () => {
             </div>
           </div>
           <div class="col-sm">
-            <label for="result">
-              Citation output{' '}
-              <button
-                class="btn btn-primary btn-sm"
-                type="button"
-                onClick={onCopy}
-                style={{textAlign: 'center', width: '6.5rem'}}
-                disabled={hasCopied}
-              >
-                {hasCopied ? 'Copied!' : 'Copy'}
-              </button>
-            </label>
+            <label for="result">Citation output</label>
             <TextareaAutosize
               id="result"
               className="form-control"
@@ -345,6 +373,20 @@ const Home: FunctionalComponent = () => {
               value={result}
               style={{resize: 'none'}}
             />
+            <button
+              class="btn btn-primary btn"
+              type="button"
+              onClick={onCopy}
+              style={{
+                textAlign: 'center',
+                width: '8rem',
+                float: 'right',
+                marginTop: 5,
+              }}
+              disabled={hasCopied}
+            >
+              {hasCopied ? 'Copied!' : 'Copy'}
+            </button>
           </div>
         </div>
 
@@ -501,12 +543,24 @@ const Home: FunctionalComponent = () => {
                 </ul>
               </div>
             </div>
-            <div style={{textAlign: 'right'}}>
+            <div>
+              <button
+                class="btn btn-danger"
+                type="button"
+                onClick={resetConfiguration}
+                disabled={isConfigurationDefault}
+              >
+                {isResetConfigurationConfirmed
+                  ? 'All changes will  be lost!'
+                  : 'Reset configuration'}
+              </button>
+
               <button
                 class="btn btn-success"
                 type="button"
-                onClick={save}
-                disabled={!hasConfigurationChanged}
+                onClick={saveConfiguration}
+                disabled={!isConfigurationUnsaved}
+                style={{float: 'right'}}
               >
                 Save configuration
               </button>
